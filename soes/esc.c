@@ -41,6 +41,37 @@ void ESC_ALstatus (uint8_t status)
    ESC_write (ESCREG_ALSTATUS, &dummy, sizeof (dummy));
 }
 
+/** Write AL Status and Al Status code to the ESC.
+ *  Call pre- and poststate change hook
+ *
+ * @param[in] status   = Write current slave status to register 0x130 AL Status
+ * reflecting actual state and error indication if present
+ * @param[in] errornumber   = Write an by EtherCAT specified Error number
+ * register 0x134 AL Status Code
+ */
+void ESC_ALstatusgotoerror (uint8_t status, uint16_t errornumber)
+{
+   uint8_t an, as;
+   /* Mask error ack of current state */
+   as = ESCvar.ALstatus & ESCREG_AL_ERRACKMASK;
+   an = as;
+   /* Set the state transition, new state in high bits and old in bits  */
+   as = ((status & ESCREG_AL_ERRACKMASK) << 4) | (as & 0x0f);
+   /* Call post state change hook case it have been configured  */
+   if (ESCvar.pre_state_change_hook != NULL)
+   {
+      ESCvar.pre_state_change_hook (&as, &an);
+   }
+   ESC_ALerror(errornumber);
+   ESC_ALstatus(status);
+   an = status;
+   /* Call post state change hook case it have been configured  */
+   if (ESCvar.post_state_change_hook != NULL)
+   {
+      ESCvar.post_state_change_hook (&as, &an);
+   }
+}
+
 /** Write ALeventMask register 0x204.
  *
  * @param[in] n   = AL Event Mask
